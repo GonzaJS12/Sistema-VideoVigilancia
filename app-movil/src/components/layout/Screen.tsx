@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
-import { ScrollView, View } from "react-native";
+import { RefreshControl, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+
+import { palette } from "@/constants/theme";
 
 import { AppHeader } from "./AppHeader";
 
@@ -11,10 +13,20 @@ interface ScreenProps {
   /** Header con botón de volver (pantallas de detalle). */
   back?: boolean;
   scroll?: boolean;
+  refreshing?: boolean;
+  onRefresh?: () => void;
   className?: string;
 }
 
-export function Screen({ children, header = true, back = false, scroll = true, className = "" }: ScreenProps) {
+export function Screen({
+  children,
+  header = true,
+  back = false,
+  scroll = true,
+  refreshing = false,
+  onRefresh,
+  className = "",
+}: ScreenProps) {
   return (
     <SafeAreaView edges={["top"]} className="flex-1 bg-background">
       {header && <AppHeader back={back} />}
@@ -23,6 +35,16 @@ export function Screen({ children, header = true, back = false, scroll = true, c
           className="flex-1"
           contentContainerClassName={`px-4 pb-8 pt-5 ${className}`}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            onRefresh ? (
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor={palette.primary}
+                colors={[palette.primary]}
+              />
+            ) : undefined
+          }
         >
           {children}
         </ScrollView>

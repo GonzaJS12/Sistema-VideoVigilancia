@@ -1,7 +1,8 @@
 export type CameraStatus = "online" | "offline" | "error";
 
-/** Pendiente de definir con backend. Se resuelve en el Paso 5. */
-export type StreamProtocol = "hls" | "mjpeg" | "webrtc";
+export type StreamProtocol = "hls" | "mjpeg" | "webrtc" | "rtsp";
+
+export type MonitoringState = "monitoreando" | "detenido";
 
 export interface CameraStream {
   protocol: StreamProtocol;
@@ -10,10 +11,14 @@ export interface CameraStream {
 
 export interface Camera {
   id: string;
+  code?: string;
   name: string;
   location: string;
   status: CameraStatus;
+  isActive?: boolean;
   isRecording: boolean;
+  isSimulated?: boolean;
+  streamActive?: boolean;
   stream: CameraStream | null;
   resolution: string;
   fps: number;
@@ -21,4 +26,19 @@ export interface Camera {
   detectionsToday: number;
   aiFilters: string[];
   lastDetectionAt: string | null;
+  lastConnectedAt?: string | null;
+  lastError?: string | null;
+}
+
+export interface MonitoringStreamInfo {
+  cameraId: string;
+  monitoringStatus: MonitoringState;
+  connectionStatus: CameraStatus;
+  isActive: boolean;
+  protocol: StreamProtocol | null;
+  webCompatible: boolean;
+  transcodingRequired: boolean;
+  playbackUrl: string | null;
+  snapshotUrl: string | null;
+  webDeliveryNote: string;
 }

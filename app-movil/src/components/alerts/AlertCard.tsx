@@ -24,7 +24,7 @@ export function AlertCard({ alert, onPress }: AlertCardProps) {
   const s = severityStyle[alert.severity];
   const cameraCode = alert.cameraName.replace("Cámara ", "CAM-");
   const archived = alert.status === "archived";
-  const timeLabel = archived ? `Ayer ${formatTime(alert.detectedAt)}` : formatTime(alert.detectedAt);
+  const timeLabel = formatTime(alert.detectedAt);
 
   return (
     <Pressable
@@ -37,6 +37,7 @@ export function AlertCard({ alert, onPress }: AlertCardProps) {
           cameraCode={cameraCode}
           severity={alert.severity}
           boundingBox={alert.boundingBox}
+          thumbnailUrl={alert.thumbnailUrl}
         />
         <View className="ml-3 flex-1">
           <View className="flex-row items-start justify-between">

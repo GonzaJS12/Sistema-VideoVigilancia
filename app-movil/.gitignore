@@ -31,7 +31,11 @@ yarn-error.*
 *.pem
 
 # local env files
+.env
 .env*.local
+
+# secondary lockfile (proyecto estandarizado con npm / package-lock.json)
+pnpm-lock.yaml
 
 # typescript
 *.tsbuildinfo

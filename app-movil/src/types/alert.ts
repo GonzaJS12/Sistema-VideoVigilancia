@@ -39,9 +39,27 @@ export interface AlertReview {
   notesUpdatedAt: string | null;
 }
 
+export interface AlertLinkedDetection {
+  id: string;
+  yoloClassName: string;
+  confidence: number;
+  detectedAt: string;
+}
+
+export interface AlertReviewHistory {
+  id: string;
+  action: string;
+  actorId: string | null;
+  actorName: string;
+  decision: string | null;
+  notes: string | null;
+  createdAt: string;
+}
+
 export interface Alert {
   id: string;
   type: AlertType;
+  primaryYoloClass?: string;
   severity: AlertSeverity;
   status: AlertStatus;
   /** 0-1 (98.4% -> 0.984) */
@@ -53,6 +71,8 @@ export interface Alert {
   detectedAt: string;
   evidence: AlertEvidence;
   review: AlertReview | null;
+  detections?: AlertLinkedDetection[];
+  reviewHistory?: AlertReviewHistory[];
   autoProtocol: string | null;
 }
 
@@ -61,6 +81,7 @@ export type AlertSummary = Pick<
   Alert,
   | "id"
   | "type"
+  | "primaryYoloClass"
   | "severity"
   | "status"
   | "confidence"
