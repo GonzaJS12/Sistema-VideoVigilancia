@@ -1,13 +1,13 @@
-﻿import { router } from "expo-router";
-import { Check, ChevronRight, LogOut, Mail, Moon, Shield } from "lucide-react-native";
+import { Check, ChevronRight, Clock, LogOut, Mail, Moon, Shield } from "lucide-react-native";
 import { useColorScheme } from "nativewind";
-import { Pressable, Switch, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, Switch, Text, View } from "react-native";
 
 import { Screen } from "@/components/layout/Screen";
 import { InfoRow } from "@/components/profile/InfoRow";
 import { ProfileHeader } from "@/components/profile/ProfileHeader";
 import { palette } from "@/constants/theme";
-import { mockUser } from "@/mocks/user";
+import { useAuth } from "@/context/AuthContext";
+import { themeStorage } from "@/services/themeStorage";
 import type { UserRole } from "@/types";
 
 const roleLabel: Record<UserRole, string> = {
@@ -33,10 +33,17 @@ function SectionHeader({ title, aside }: { title: string; aside: string }) {
 export default function ProfileScreen() {
   const { colorScheme, setColorScheme } = useColorScheme();
   const isDark = colorScheme !== "light";
-  const user = mockUser;
+  const { user, logout } = useAuth();
 
-  // Mock: en el Paso 5 se limpia la sesión (useAuth().logout)
-  const handleLogout = () => router.replace("/login");
+  if (!user) {
+    return (
+      <Screen>
+        <View className="items-center justify-center py-16">
+          <ActivityIndicator color={palette.primary} />
+        </View>
+      </Screen>
+    );
+  }
 
   return (
     <Screen>
@@ -65,13 +72,25 @@ export default function ProfileScreen() {
         <InfoRow
           label="Rol asignado"
           value={roleLabel[user.role]}
-          last
+          last={!user.shift}
           right={
             <View className="h-9 w-9 items-center justify-center rounded-lg border border-border bg-surface-alt">
               <Shield size={16} color={palette.muted} />
             </View>
           }
         />
+        {user.shift ? (
+          <InfoRow
+            label="Turno operativo"
+            value={user.shift}
+            last
+            right={
+              <View className="h-9 w-9 items-center justify-center rounded-lg border border-border bg-surface-alt">
+                <Clock size={16} color={palette.muted} />
+              </View>
+            }
+          />
+        ) : null}
       </View>
 
       <SectionHeader title="Cuenta" aside="Acciones" />
@@ -88,14 +107,20 @@ export default function ProfileScreen() {
           </View>
           <Switch
             value={isDark}
-            onValueChange={(v) => setColorScheme(v ? "dark" : "light")}
+            onValueChange={(v) => {
+              const next = v ? "dark" : "light";
+              setColorScheme(next);
+              void themeStorage.saveTheme(next);
+            }}
             trackColor={{ false: "#CBD5E1", true: palette.primary }}
             thumbColor="#fff"
           />
         </View>
 
         <Pressable
-          onPress={handleLogout}
+          onPress={() => {
+            void logout();
+          }}
           className="flex-row items-center rounded-card border border-danger/40 bg-danger/10 p-3.5 active:opacity-80"
         >
           <View className="h-11 w-11 items-center justify-center rounded-xl border border-danger/40 bg-danger/15">

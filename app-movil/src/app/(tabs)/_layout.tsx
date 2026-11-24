@@ -1,14 +1,29 @@
-import { Tabs } from "expo-router";
+import { Redirect, Tabs } from "expo-router";
 import { Bell, Clock, Home, User, Video } from "lucide-react-native";
 import { useColorScheme } from "nativewind";
+import { ActivityIndicator, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { palette } from "@/constants/theme";
+import { useAuth } from "@/context/AuthContext";
 
 export default function TabsLayout() {
   const { colorScheme } = useColorScheme();
   const isLight = colorScheme === "light";
   const insets = useSafeAreaInsets();
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <View className="flex-1 items-center justify-center bg-background">
+        <ActivityIndicator size="large" color={palette.primary} />
+      </View>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Redirect href="/login" />;
+  }
 
   return (
     <Tabs

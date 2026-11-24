@@ -1,8 +1,11 @@
+import { Image } from "expo-image";
 import { ChevronRight, Video } from "lucide-react-native";
 import { Pressable, Text, View } from "react-native";
 
+import { resolveApiAssetUrl } from "@/config/env";
 import { palette } from "@/constants/theme";
-import type { HistoryEntry, RiskLevel } from "@/types";
+import { useAuth } from "@/context/AuthContext";
+import type { AlertStatus, HistoryEntry, RiskLevel } from "@/types";
 import { alertTypeLabel } from "@/utils/alerts";
 
 const risk: Record<RiskLevel, { label: string; box: string; text: string; dot: string; border: string }> = {
@@ -29,6 +32,29 @@ const risk: Record<RiskLevel, { label: string; box: string; text: string; dot: s
   },
 };
 
+const statusDisplay: Record<AlertStatus, { label: string; box: string; text: string }> = {
+  confirmed: {
+    label: "✓ Resultado: Confirmada",
+    box: "border-primary/40 bg-primary/10",
+    text: "text-primary",
+  },
+  false_positive: {
+    label: "✕ Resultado: Falsa detección",
+    box: "border-border bg-surface-alt",
+    text: "text-muted",
+  },
+  pending_validation: {
+    label: "• Estado: Pendiente de validación",
+    box: "border-warning/40 bg-warning/10",
+    text: "text-warning",
+  },
+  archived: {
+    label: "• Estado: Archivado",
+    box: "border-border bg-surface-alt",
+    text: "text-muted",
+  },
+};
+
 function formatWhen(iso: string) {
   const d = new Date(iso);
   const now = new Date();
@@ -52,8 +78,10 @@ const tag: Record<string, string> = {
 
 export function HistoryItem({ entry, onPress }: { entry: HistoryEntry; onPress?: () => void }) {
   const r = risk[entry.risk];
-  const confirmed = entry.status === "confirmed";
+  const st = statusDisplay[entry.status];
   const cam = entry.cameraName.replace("Cámara ", "CAM-");
+  const { accessToken } = useAuth();
+  const thumbnailUrl = resolveApiAssetUrl(entry.thumbnailUrl);
 
   return (
     <Pressable
@@ -64,14 +92,24 @@ export function HistoryItem({ entry, onPress }: { entry: HistoryEntry; onPress?:
         <View
           className={`h-[96px] w-[92px] overflow-hidden rounded-xl border bg-[#0A1420] ${r.border}`}
         >
+          {thumbnailUrl ? (
+            <Image
+              source={{
+                uri: thumbnailUrl,
+                headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+              }}
+              contentFit="cover"
+              style={{ position: "absolute", top: 0, right: 0, bottom: 0, left: 0 }}
+            />
+          ) : null}
           <View className={`absolute left-1.5 top-1.5 rounded-sm border px-1 py-0.5 ${r.box}`}>
             <Text className={`font-mono text-[8px] ${r.text}`}>
               AI: {Math.round(entry.confidence * 100)}%
             </Text>
           </View>
-          <View className="absolute bottom-1.5 left-1.5 right-1.5 flex-row justify-between">
+          <View className="absolute bottom-1.5 left-1.5 right-1.5 flex-row justify-between rounded-sm bg-black/55 px-1 py-0.5">
             <Text className={`font-mono text-[7px] ${r.text}`}>[{tag[entry.type]}]</Text>
-            <Text className="font-mono text-[7px] text-white/70">{cam}</Text>
+            <Text className="font-mono text-[7px] text-white/90">{cam}</Text>
           </View>
         </View>
 
@@ -99,14 +137,8 @@ export function HistoryItem({ entry, onPress }: { entry: HistoryEntry; onPress?:
           <View className={`h-1.5 w-1.5 rounded-full ${r.dot}`} />
           <Text className={`font-mono text-[10px] ${r.text}`}>Riesgo: {r.label}</Text>
         </View>
-        <View
-          className={`flex-row items-center gap-1.5 self-start rounded-md border px-2 py-1 ${
-            confirmed ? "border-primary/40 bg-primary/10" : "border-border bg-surface-alt"
-          }`}
-        >
-          <Text className={`font-mono text-[10px] ${confirmed ? "text-primary" : "text-muted"}`}>
-            {confirmed ? "✓ Resultado: Confirmada" : "✕ Resultado: Falsa detección"}
-          </Text>
+        <View className={`flex-row items-center gap-1.5 self-start rounded-md border px-2 py-1 ${st.box}`}>
+          <Text className={`font-mono text-[10px] ${st.text}`}>{st.label}</Text>
         </View>
       </View>
     </Pressable>

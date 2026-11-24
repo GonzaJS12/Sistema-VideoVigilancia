@@ -2,20 +2,45 @@ import { router } from "expo-router";
 import { ArrowRight, Eye, EyeOff, Lock, Mail, ShieldCheck } from "lucide-react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useState } from "react";
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from "react-native";
+import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { GradientButton } from "@/components/ui/GradientButton";
 import { TextField } from "@/components/ui/TextField";
 import { palette } from "@/constants/theme";
+import { useAuth } from "@/context/AuthContext";
+import { ApiError } from "@/services/apiClient";
 
 export default function LoginScreen() {
+  const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Mock: en el Paso 5 se reemplaza por useAuth().login
-  const handleLogin = () => router.replace("/home");
+  const handleLogin = async () => {
+    const cleanEmail = email.trim();
+    if (!cleanEmail || !password) {
+      setErrorMsg("Ingresá tu correo electrónico y contraseña.");
+      return;
+    }
+
+    setErrorMsg(null);
+    setSubmitting(true);
+    try {
+      await login({ email: cleanEmail, password });
+      router.replace("/home");
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setErrorMsg(err.message);
+      } else {
+        setErrorMsg("No se pudo iniciar sesión. Intentá nuevamente.");
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <SafeAreaView className="flex-1 bg-background">
@@ -73,15 +98,32 @@ export default function LoginScreen() {
               />
             </View>
 
+            {errorMsg ? (
+              <View className="mt-5 rounded-xl border border-danger/50 bg-danger/10 px-3.5 py-2.5">
+                <Text className="text-xs text-danger">{errorMsg}</Text>
+              </View>
+            ) : null}
+
             <View className="mt-7">
               <GradientButton
-                label="Iniciar sesión"
-                onPress={handleLogin}
+                label={submitting ? "Ingresando..." : "Iniciar sesión"}
+                onPress={() => {
+                  void handleLogin();
+                }}
+                disabled={submitting}
                 icon={<ArrowRight size={18} color="#0B0F17" />}
               />
             </View>
 
-            <Pressable className="mt-6 items-center">
+            <Pressable
+              onPress={() =>
+                Alert.alert(
+                  "Recuperación de contraseña",
+                  "El restablecimiento de credenciales es gestionado por un administrador del sistema SVI.",
+                )
+              }
+              className="mt-6 items-center"
+            >
               <Text className="text-sm text-primary underline">¿Olvidaste tu contraseña?</Text>
             </Pressable>
           </View>

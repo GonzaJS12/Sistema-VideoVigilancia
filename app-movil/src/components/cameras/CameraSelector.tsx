@@ -1,5 +1,5 @@
 import { Check, Video } from "lucide-react-native";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
 
 import { palette } from "@/constants/theme";
 import type { Camera } from "@/types";
@@ -12,7 +12,12 @@ interface CameraSelectorProps {
 
 export function CameraSelector({ cameras, selectedId, onSelect }: CameraSelectorProps) {
   return (
-    <View className="flex-row gap-3">
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerClassName="gap-3 px-1 py-1"
+      className="-mx-1 grow-0"
+    >
       {cameras.map((camera) => {
         const selected = camera.id === selectedId;
         const online = camera.status === "online";
@@ -20,7 +25,7 @@ export function CameraSelector({ cameras, selectedId, onSelect }: CameraSelector
           <Pressable
             key={camera.id}
             onPress={() => onSelect(camera.id)}
-            className={`flex-1 items-center rounded-card border-2 px-3 py-4 ${
+            className={`min-w-[160px] items-center rounded-card border-2 px-4 py-4 ${
               selected ? "border-primary bg-primary/10" : "border-border bg-surface"
             }`}
           >
@@ -35,6 +40,7 @@ export function CameraSelector({ cameras, selectedId, onSelect }: CameraSelector
                 className={`font-sans-semibold text-base ${
                   selected ? "text-foreground" : "text-muted"
                 }`}
+                numberOfLines={1}
               >
                 {camera.name}
               </Text>
@@ -48,11 +54,13 @@ export function CameraSelector({ cameras, selectedId, onSelect }: CameraSelector
                 ● {online ? "En línea" : "Sin señal"}
               </Text>
             ) : (
-              <Text className="mt-2 text-xs text-muted">{camera.location}</Text>
+              <Text className="mt-2 text-xs text-muted" numberOfLines={1}>
+                {camera.location}
+              </Text>
             )}
           </Pressable>
         );
       })}
-    </View>
+    </ScrollView>
   );
 }
