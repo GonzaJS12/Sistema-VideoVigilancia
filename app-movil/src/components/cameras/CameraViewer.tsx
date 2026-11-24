@@ -2,8 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Image } from "expo-image";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { RefreshCw, VideoOff } from "lucide-react-native";
-import { useEffect, useState } from "react";
-import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { ActivityIndicator, Platform, Pressable, Text, View } from "react-native";
 
 import { resolveApiAssetUrl } from "@/config/env";
 import { palette } from "@/constants/theme";
@@ -20,11 +20,11 @@ function useClock() {
   return now;
 }
 
-function formatUtc(date: Date) {
+function formatLocalTime(date: Date) {
   const p = (n: number) => String(n).padStart(2, "0");
-  return `${date.getUTCFullYear()}-${p(date.getUTCMonth() + 1)}-${p(date.getUTCDate())} ${p(
-    date.getUTCHours(),
-  )}:${p(date.getUTCMinutes())}:${p(date.getUTCSeconds())} UTC`;
+  return `${date.getFullYear()}-${p(date.getMonth() + 1)}-${p(date.getDate())} ${p(
+    date.getHours(),
+  )}:${p(date.getMinutes())}:${p(date.getSeconds())}`;
 }
 
 function SignalBars({ online }: { online: boolean }) {
@@ -77,29 +77,84 @@ export function CameraViewer({ camera }: CameraViewerProps) {
   const isMonitoring = streamInfo?.monitoringStatus === "monitoreando";
   const isOnline = camera.status === "online";
   const isHls = streamInfo?.protocol === "hls" && Boolean(streamInfo.playbackUrl);
+  const isWebMjpeg = Platform.OS === "web" && !isHls && (isOnline || isMonitoring);
+  const useNativeWsStream = Platform.OS !== "web" && !isHls && (isOnline || isMonitoring) && Boolean(accessToken);
+
+  const [wsFrameUri, setWsFrameUri] = useState<string | null>(null);
+  const [prevWsFrameUri, setPrevWsFrameUri] = useState<string | null>(null);
+  const wsRef = useRef<WebSocket | null>(null);
 
   useEffect(() => {
     setSnapshotError(false);
+    setWsFrameUri(null);
+    setPrevWsFrameUri(null);
     setTick(Date.now());
   }, [camera.id]);
 
+  // Stream continuo por WebSocket de baja latencia para móvil nativo (sin polling HTTP por frame)
   useEffect(() => {
-    if (isHls || (!isMonitoring && !isOnline)) return;
-    const id = setInterval(() => {
-      setSnapshotError(false);
-      setTick(Date.now());
-    }, 2000);
-    return () => clearInterval(id);
-  }, [isHls, isMonitoring, isOnline]);
+    if (!useNativeWsStream || !accessToken) {
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+      return;
+    }
+
+    let active = true;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const connectWs = () => {
+      if (!active) return;
+      const url = camerasService.getWsStreamUrl(camera.id, accessToken);
+      const ws = new WebSocket(url);
+      wsRef.current = ws;
+
+      ws.onmessage = (ev) => {
+        if (!active || typeof ev.data !== "string") return;
+        if (ev.data.startsWith("data:image/")) {
+          setSnapshotError(false);
+          setWsFrameUri((current) => {
+            if (current) setPrevWsFrameUri(current);
+            return ev.data;
+          });
+        }
+      };
+
+      ws.onerror = () => {
+        ws.close();
+      };
+
+      ws.onclose = () => {
+        wsRef.current = null;
+        if (!active) return;
+        reconnectTimer = setTimeout(connectWs, 800);
+      };
+    };
+
+    connectWs();
+
+    return () => {
+      active = false;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+    };
+  }, [useNativeWsStream, accessToken, camera.id, tick]);
+
+  const ackNextWsFrame = () => {
+    const ws = wsRef.current;
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send("next");
+    }
+  };
 
   const code = camera.code ?? camera.name.replace("Cámara ", "CAM-");
-  const baseSnapshotUrl = resolveApiAssetUrl(
-    streamInfo?.snapshotUrl ?? camerasService.getSnapshotPath(camera.id),
-  );
-  const snapshotUrl =
-    baseSnapshotUrl && !isHls && (isOnline || isMonitoring)
-      ? `${baseSnapshotUrl}${baseSnapshotUrl.includes("?") ? "&" : "?"}t=${tick}`
-      : null;
+  const mjpegUrl = isWebMjpeg
+    ? resolveApiAssetUrl(camerasService.getMjpegStreamPath(camera.id, accessToken, tick))
+    : null;
 
   return (
     <View className="overflow-hidden rounded-card border border-border bg-surface">
@@ -111,16 +166,36 @@ export function CameraViewer({ camera }: CameraViewerProps) {
           </View>
         ) : isHls && streamInfo?.playbackUrl ? (
           <HlsStreamPlayer url={streamInfo.playbackUrl} />
-        ) : snapshotUrl && !snapshotError ? (
+        ) : mjpegUrl && !snapshotError ? (
           <Image
-            source={{
-              uri: snapshotUrl,
-              headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
-            }}
+            source={{ uri: mjpegUrl }}
             contentFit="cover"
             style={{ position: "absolute", top: 0, right: 0, bottom: 0, left: 0 }}
             onError={() => setSnapshotError(true)}
           />
+        ) : useNativeWsStream && wsFrameUri ? (
+          <>
+            {prevWsFrameUri && prevWsFrameUri !== wsFrameUri ? (
+              <Image
+                source={{ uri: prevWsFrameUri }}
+                contentFit="cover"
+                transition={0}
+                style={{ position: "absolute", top: 0, right: 0, bottom: 0, left: 0 }}
+              />
+            ) : null}
+            <Image
+              source={{ uri: wsFrameUri }}
+              transition={0}
+              contentFit="cover"
+              style={{ position: "absolute", top: 0, right: 0, bottom: 0, left: 0 }}
+              onLoad={ackNextWsFrame}
+            />
+          </>
+        ) : useNativeWsStream && !snapshotError ? (
+          <View className="items-center gap-2">
+            <ActivityIndicator color={palette.primary} />
+            <Text className="font-mono text-[10px] text-muted">Recibiendo video en tiempo real...</Text>
+          </View>
         ) : (
           <View className="items-center px-6 text-center">
             <VideoOff size={28} color={palette.muted} />
@@ -161,7 +236,7 @@ export function CameraViewer({ camera }: CameraViewerProps) {
           >
             {isMonitoring ? "IA ACTIVA • " : "DETENIDA • "}
           </Text>
-          <Text className="font-mono text-[10px] text-white">{formatUtc(now)}</Text>
+          <Text className="font-mono text-[10px] text-white">{formatLocalTime(now)}</Text>
         </View>
 
         {/* Botón de refresco manual de frame */}

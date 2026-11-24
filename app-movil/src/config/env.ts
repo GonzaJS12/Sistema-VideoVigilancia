@@ -1,3 +1,4 @@
+import Constants from "expo-constants";
 import { Platform } from "react-native";
 
 function resolveDefaultBaseUrl(): string {
@@ -12,10 +13,24 @@ function resolveDefaultBaseUrl(): string {
     );
   }
 
+  if (Platform.OS === "web" && typeof window !== "undefined" && window.location?.hostname) {
+    const h = window.location.hostname === "localhost" ? "127.0.0.1" : window.location.hostname;
+    return `http://${h}:8000`;
+  }
+
+  // Detecta automáticamente la IP LAN de la PC donde corre Metro/Expo (ej. 192.168.100.222)
+  const hostUri = Constants.expoConfig?.hostUri;
+  if (hostUri) {
+    const host = hostUri.split(":")[0]?.trim();
+    if (host && host !== "localhost" && host !== "127.0.0.1") {
+      return `http://${host}:8000`;
+    }
+  }
+
   if (Platform.OS === "android") {
     return "http://10.0.2.2:8000";
   }
-  return "http://localhost:8000";
+  return "http://127.0.0.1:8000";
 }
 
 export const API_BASE_URL = resolveDefaultBaseUrl();
